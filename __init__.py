@@ -2,11 +2,20 @@ import sys
 from os.path import dirname, abspath, basename
 import time
 
+from mycroft.version import CORE_VERSION_MAJOR, \
+     CORE_VERSION_MINOR, CORE_VERSION_BUILD
 from mycroft.skills.core import MycroftSkill, intent_handler
 from mycroft.util.log import getLogger
 from adapt.intent import IntentBuilder
 
 from spotipy import Spotify
+
+compatible_core_version_sum = 27
+
+sum_of_core = CORE_VERSION_MAJOR + CORE_VERSION_MINOR + CORE_VERSION_BUILD
+if sum_of_core >= compatible_core_version_sum:
+    import mycroft.client.enclosure.display_manager as DisplayManager
+
 
 sys.path.append(abspath(dirname(__file__)))
 auth = __import__('auth')
@@ -61,6 +70,7 @@ class SpotifySkill(MycroftSkill):
         .require('PlaylistKeyword')\
         .build())
     def play_playlist(self, message):
+        self.display_notes()
         p = message.data.get('PlaylistKeyword')
         device = self.spotify.get_devices()
         if device and len(device) > 0:
@@ -70,13 +80,47 @@ class SpotifySkill(MycroftSkill):
             time.sleep(2)
             self.spotify.play(dev_id, self.playlists[p])
 
+    def display_notes(self):
+        notes = ['IIAEAOOHGAGEGOOHAA', 'IIAAACAHPDDADCDHPD']
+
+        #  clear screen
+        self.enclosure.mouth_display(img_code="HIAAAAAAAAAAAAAA",
+                                     refresh=False)
+        self.enclosure.mouth_display(img_code="HIAAAAAAAAAAAAAA",
+                                     x=24, refresh=False)
+
+        #  draw notes
+        for pos in range(4):
+            self.enclosure.mouth_display(img_code=notes[pos % 2],
+                                         x=pos * 8,
+                                         refresh=False)
+
+    @intent_handler(IntentBuilder('DisplayIntent')\
+        .require('TestKeyword')\
+        .require('DisplayKeyword')\
+        .build())
+    def test_display(self, message):
+        self.speak("Testing display")
+        time.sleep(10)
+        self.display_notes()
+
+
     def stop(self):
         print "stopping spotify"
+        self.enclosure.reset()
         device = self.spotify.get_devices()
         print device
         if device:
+            self.enclosure.reset()
             dev_id = device['devices'][0]['id']
             self.spotify.pause(dev_id)
+
+    def _should_display_notes(self):
+        _get_active = DisplayManager.get_active
+        if _get_active() == '' or _get_active() == self.name:
+            return True
+        else:
+            return False
 
 
 def create_skill():
