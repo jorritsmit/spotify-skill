@@ -74,7 +74,7 @@ class SpotifySkill(MycroftSkill):
         .build())
     def play_playlist(self, message):
         if not self.timer:
-            clear_display()
+            self.clear_display()
             self.timer = Timer(3, self._update_notes)
         p = message.data.get('PlaylistKeyword')
         device = self.spotify.get_devices()
