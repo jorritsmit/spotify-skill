@@ -235,6 +235,8 @@ class SpotifySkill(MycroftSkill):
         self.OAUTH_ID = 1
         self.DEFAULT_VOLUME = 65
         self._playlists = None
+        self._login_scheduled = False
+        self._last_websettings = 0
 
     def launch_librespot(self):
         """ Launch the librespot binary for the Mark-1.
@@ -260,6 +262,8 @@ class SpotifySkill(MycroftSkill):
                 self.spotify.volume(dev['id'], self.DEFAULT_VOLUME)
 
     def initialize(self):
+        # Cancel any lingering Scheduled Login attempt
+        self.cancel_scheduled_event('SpotifyLogin')
         # Setup handlers for playback control messages
         self.add_event('mycroft.audio.service.next', self.next_track)
         self.add_event('mycroft.audio.service.prev', self.prev_track)
@@ -269,15 +273,33 @@ class SpotifySkill(MycroftSkill):
         # Check and then monitor for credential changes
         self.settings.set_changed_callback(self.on_websettings_changed)
         self.on_websettings_changed()
+        self.try_login()
 
     def on_websettings_changed(self):
+        """ Handler called when websettings change.
+        Not allowed to do anything unless last call was 60 seconds ago.
+        """
+        LOG.info('Websettings changed')
+        now = time.time()
+        if now >= self._last_websettings + 60:
+            self._last_websettings = now
+            self.try_login()
+
+    def try_login(self):
+        """ Try to login and schedule a retry if login failed. """
         if not self.spotify:
             if 'user' in self.settings and 'password' in self.settings:
                 try:
                     self.load_credentials()
+                    raise
                 except:
+                    # Don't schedule if already scheduled
+                    if self._login_scheduled == True:
+                        LOG.debug('Already scheduled')
+                        return
+                    self._login_scheduled = True
                     # Retry in 5 minutes
-                    self.schedule_repeating_event(self.on_websettings_changed,
+                    self.schedule_repeating_event(self.try_login,
                                                   None, 5*60,
                                                   name='SpotifyLogin')
 
@@ -300,6 +322,7 @@ class SpotifySkill(MycroftSkill):
             # been connected
             self.device_name = DeviceApi().get().get('name')
             self.cancel_scheduled_event('SpotifyLogin')
+            self._login_scheduled = False
             self.launch_librespot()
 
     ######################################################################
@@ -736,6 +759,7 @@ class SpotifySkill(MycroftSkill):
         """ Remove the monitor at shutdown. """
         self.stop_monitor()
         self.stop_librespot()
+        self.cancel_scheduled_event('SpotifyLogin')
 
         # Do normal shutdown procedure
         super(SpotifySkill, self).shutdown()
