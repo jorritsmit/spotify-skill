@@ -451,6 +451,16 @@ class SpotifySkill(MycroftSkill):
         return None
 
     def get_default_device(self):
+        dev = self._get_default_device()
+        if not dev and self.process:
+            LOG.info('Restarting librespot')
+            self.stop_librespot()
+            self.launch_librespot()
+            self.__device_list = [] # Clear device list so it's updated
+            dev = self._get_default_device()
+        return dev
+
+    def _get_default_device(self):
         """ Get preferred playback device """
         if self.spotify:
             # When there is an active Spotify device somewhere, use it
@@ -466,8 +476,6 @@ class SpotifySkill(MycroftSkill):
             if not dev:
                 dev = self.device_by_name(gethostname())
             # use first best device if none of the prioritized works
-            if not dev and len(self.devices) > 0:
-                dev = self.devices[0]
             if dev and not dev['is_active']:
                 self.spotify.transfer_playback(dev['id'], False)
             return dev
