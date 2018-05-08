@@ -545,7 +545,7 @@ class SpotifySkill(MycroftSkill):
 
     def play_album(self, message):
         """
-        When the user wants to hear an album, optionally with artist informaiton attached
+        When the user wants to hear an album, optionally with artist information attached
         Play the album <album> by <artist>
 
         Args:
@@ -727,7 +727,7 @@ class SpotifySkill(MycroftSkill):
             except Exception as e:
                 LOG.error("Unable to obtain the name, artist, and/or URI information while asked to play something. " + str(e))
 
-    def search(self, query, search_type):
+    def search(self, query, search_type=None):
         """ Search for an album, playlist or artist.
         Arguments:
             query:       search query (album title, artist, etc.)
@@ -736,6 +736,9 @@ class SpotifySkill(MycroftSkill):
 
             TODO: improve results of albums by checking artist
         """
+        if search_type is None:
+            search_type = 'track'
+
         dev = self.get_default_device()
         if not dev:
             self.speak_dialog('NoDefaultDeviceAvailable')
